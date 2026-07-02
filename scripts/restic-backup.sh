@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Load env
+STACK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+set -a; . "$STACK_DIR/.env"; set +a
+
+export RESTIC_PASSWORD B2_ACCOUNT_ID B2_ACCOUNT_KEY
+
+BACKUP_PATHS=(/srv /opt/stacks)
+# Time Machine is already a backup of the Mac, is huge, and churns constantly — exclude it.
+EXCLUDES=(--exclude /srv/timemachine)
+
+RETENTION=(--keep-daily 7 --keep-weekly 4 --keep-monthly 6)
+
+ensure_repo() {
+  local repo="$1"; shift
+  if ! restic -r "$repo" snapshots >/dev/null 2>&1; then
+    echo "[restic] Initializing repo: $repo"
+    restic -r "$repo" init
+  fi
+}
+
+run_target() {
+  local repo="$1"
+  echo "[restic] Backing up to $repo"
+  ensure_repo "$repo"
+  restic -r "$repo" backup "${BACKUP_PATHS[@]}" "${EXCLUDES[@]}"
+  echo "[restic] Pruning $repo"
+  restic -r "$repo" forget "${RETENTION[@]}" --prune
+}
+
+# --- B2 (offsite, always) ---
+B2_REPO="b2:${B2_BUCKET}:${RESTIC_B2_PATH}"
+run_target "$B2_REPO"
+
+# --- Local repo (optional, faster restores) ---
+if [[ -n "${RESTIC_LOCAL_REPO:-}" ]]; then
+  run_target "$RESTIC_LOCAL_REPO"
+fi
+
+echo "[restic] Backup complete."

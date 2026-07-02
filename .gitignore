@@ -1,0 +1,6 @@
+# Secrets — never commit
+.env
+
+# Local editor / OS cruft
+.DS_Store
+*.swp

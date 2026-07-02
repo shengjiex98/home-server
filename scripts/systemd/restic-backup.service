@@ -1,0 +1,10 @@
+[Unit]
+Description=restic backup of /srv and /opt/stacks
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env bash __BACKUP_SCRIPT__
+# Optional: ping a healthcheck URL on success (uncomment and set URL)
+# ExecStartPost=/usr/bin/curl -fsS -m 10 https://hc-ping.com/YOUR-UUID
