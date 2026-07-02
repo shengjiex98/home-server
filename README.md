@@ -33,13 +33,17 @@ The bootstrap script creates the `/srv` data tree, installs Docker when needed, 
 
 ## Accessing services
 
-Publish code-server through the Tailscale node:
+Publish code-server through the Tailscale node. The `tailscale` and `code-server`
+containers are separate on the Docker network (no shared network namespace), so the
+serve target must name the `code-server` service rather than `127.0.0.1`/a bare port:
 
 ```bash
-docker exec tailscale tailscale serve --bg 8080
+docker exec tailscale tailscale serve --bg http://code-server:8080
 ```
 
-Then open `http://<tailscale-name>:8080` from a device on the same tailnet. The Compose port itself is bound only to host loopback and is not publicly exposed.
+Then open `https://<tailscale-name>` (no port — `tailscale serve` publishes HTTPS on
+443 by default) from a device on the same tailnet. The Compose port itself is bound
+only to host loopback and is not publicly exposed.
 
 Connect to the file shares from macOS Finder with:
 
