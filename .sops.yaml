@@ -2,5 +2,5 @@
 # ~/.config/sops/age/keys.txt (BACK THAT KEY UP in your password manager —
 # without it .env.sops cannot be decrypted).
 creation_rules:
-  - path_regex: (^|/)\.env$
+  - path_regex: (^|/)\.env(\.sops)?$
     age: age16m09lxysn6j7tsvlhmtn8mnw797fu457d9vrn7tt6vjklrt0jvcs8s4ssq
