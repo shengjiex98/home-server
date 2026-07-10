@@ -1,5 +1,8 @@
-# Secrets — never commit
+# Secrets — never commit the plaintext (.env.sops, the encrypted copy, IS committed)
 .env
+
+# homepage writes logs into its bind-mounted config dir
+gateway/homepage/logs/
 
 # Local editor / OS cruft
 .DS_Store

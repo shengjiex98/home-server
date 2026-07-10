@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "packageRules": [
+    {
+      "description": "servercontainers/samba tags look like a3.24.1-s4.23.8-r0 (alpine + samba versions)",
+      "matchPackageNames": ["ghcr.io/servercontainers/samba"],
+      "versioning": "regex:^a(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-s(?<build>.+)$"
+    },
+    {
+      "description": "Group all Tailscale sidecar bumps into one PR",
+      "matchPackageNames": ["tailscale/tailscale"],
+      "groupName": "tailscale"
+    }
+  ]
+}

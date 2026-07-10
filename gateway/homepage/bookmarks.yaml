@@ -1,0 +1,6 @@
+---
+- Admin:
+    - Tailscale console:
+        - href: https://login.tailscale.com/admin/machines
+    - Stack repo:
+        - href: https://github.com/shengjiex98/home-server

@@ -1,0 +1,10 @@
+---
+title: Home Server
+description: Services on the home server stack
+headerStyle: clean
+statusStyle: dot
+hideVersion: true
+layout:
+  Services:
+    style: row
+    columns: 3
