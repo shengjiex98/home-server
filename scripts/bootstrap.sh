@@ -22,10 +22,11 @@ log "Detected distro family: $FAMILY ($PRETTY_NAME)"
 
 # --- Directory trees ---
 log "Creating /opt/stacks and /srv trees"
-mkdir -p /srv/{timemachine,shares,tailscale}
+mkdir -p /srv/{timemachine,shares,tailscale,ts-code,ts-files}
 mkdir -p /srv/code-server/{config,projects}
-# code-server + samba run as uid 1000; make sure it owns its data
-chown -R 1000:1000 /srv/code-server /srv/timemachine /srv/shares 2>/dev/null || true
+mkdir -p /srv/filebrowser/{database,config}
+# code-server, samba and filebrowser run as uid 1000; make sure it owns their data
+chown -R 1000:1000 /srv/code-server /srv/timemachine /srv/shares /srv/filebrowser 2>/dev/null || true
 
 # --- Install Docker if absent ---
 if ! command -v docker >/dev/null 2>&1; then
@@ -74,6 +75,26 @@ else
   warn "No recognized firewall tool active; skipping (fine if using Tailscale only)."
 fi
 
+# --- Secrets tooling: age + sops ---
+if ! command -v age-keygen >/dev/null 2>&1; then
+  log "Installing age"
+  if [[ "$FAMILY" == "fedora" ]]; then dnf -y install age; else apt-get -y install age; fi
+fi
+if ! command -v sops >/dev/null 2>&1; then
+  SOPS_VER=v3.13.2
+  log "Installing sops $SOPS_VER"
+  ARCH=$(uname -m); case "$ARCH" in x86_64) SOPS_ARCH=amd64 ;; aarch64) SOPS_ARCH=arm64 ;; *) SOPS_ARCH=$ARCH ;; esac
+  curl -sL -o /usr/local/bin/sops \
+    "https://github.com/getsops/sops/releases/download/${SOPS_VER}/sops-${SOPS_VER}.linux.${SOPS_ARCH}"
+  chmod +x /usr/local/bin/sops
+fi
+if [[ ! -f /root/.config/sops/age/keys.txt ]]; then
+  warn "No age key at /root/.config/sops/age/keys.txt."
+  warn "  Migrating?   Restore the key from your password manager to that path."
+  warn "  First setup? Run: mkdir -p /root/.config/sops/age && age-keygen -o /root/.config/sops/age/keys.txt"
+  warn "  Then BACK THE KEY UP and put its public key in .sops.yaml."
+fi
+
 # --- SELinux note (Fedora) ---
 if [[ "$FAMILY" == "fedora" ]]; then
   if command -v getenforce >/dev/null 2>&1 && [[ "$(getenforce)" == "Enforcing" ]]; then
@@ -82,4 +103,5 @@ if [[ "$FAMILY" == "fedora" ]]; then
 fi
 
 log "Bootstrap complete."
-log "Next: cp .env.example .env && edit it, then: docker compose up -d"
+log "Next: ./scripts/secrets.sh decrypt   (or create .env from .env.example on first setup)"
+log "Then: docker compose up -d"

@@ -1,0 +1,5 @@
+include:
+  - gateway/compose.yml
+  - code-server/compose.yml
+  - files/compose.yml
+  - samba/compose.yml

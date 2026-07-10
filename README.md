@@ -1,115 +1,155 @@
 # Home Server Stack
 
-This repository defines a distro-independent, container-based home server stack with Tailscale as the private front door, code-server for browser-based development, and Samba shares including a macOS Time Machine target. Configuration, Compose definitions, and operational scripts live in git at `/opt/stacks`; all container-written data lives in visible bind mounts under `/srv`, keeping backup, inspection, and migration independent of the host distribution.
+A distro-independent, container-based home server stack. Every HTTP service is published on the tailnet under its own hostname by a dedicated Tailscale sidecar — no port numbers, no reverse-proxy config, HTTPS certificates handled automatically. A [homepage](https://gethomepage.dev) dashboard on the gateway node is the landing page for everything. Compose definitions, service config, and operational scripts live in git at `/opt/stacks`; all container-written data lives in visible bind mounts under `/srv`; secrets live encrypted in git (`.env.sops`, sops + age).
+
+## Services
+
+| URL | Service |
+|---|---|
+| `https://<gateway>.<tailnet>.ts.net` | Landing page: all services with live status |
+| `https://code.<tailnet>.ts.net` | code-server (VS Code in the browser) |
+| `https://files.<tailnet>.ts.net` | FileBrowser (web file manager over the SMB data) |
+| `smb://<server>` (LAN, auto-discovered) | Samba: general share + Time Machine |
+
+Everything HTTP is tailnet-only — nothing is exposed to the public internet, and Tailscale is the authentication layer. The first load of each URL can take a few seconds while the TLS certificate is minted.
+
+## Repository layout
+
+```
+compose.yml              # top-level; includes each service's compose file
+gateway/                 # tailscale gateway node + homepage dashboard + docker socket proxy
+code-server/             # code-server + its tailscale sidecar
+files/                   # filebrowser + its tailscale sidecar
+samba/                   # SMB + Time Machine (LAN, host networking)
+scripts/                 # bootstrap, secrets, backup/restore, tm-usage
+.env.sops                # encrypted secrets (the only copy in git)
+.sops.yaml               # sops config: age public key
+renovate.json            # automated image-update PRs
+```
+
+Each HTTP service follows the same pattern: the app container (no published ports) plus a `tailscale/tailscale` sidecar whose `serve.json` (in git) proxies HTTPS 443 to the app over the Docker network. The sidecar's `hostname:` is the service's tailnet name.
 
 ## Prerequisites
 
-You need:
-
 - A cloud VM or home PC running Ubuntu/Debian or Fedora.
-- A Tailscale account and an auth key from the [Tailscale admin console](https://login.tailscale.com/admin/settings/keys).
-- A Backblaze B2 bucket and application key.
-- `git` for cloning the repository.
-- `restic` for backup and restore. Install it with `apt install restic` on Ubuntu/Debian or `dnf install restic` on Fedora.
+- A Tailscale account and a **reusable, non-ephemeral** auth key from the [admin console](https://login.tailscale.com/admin/settings/keys) (one key is shared by the gateway and all sidecars). MagicDNS and HTTPS certificates must be enabled for the tailnet (Admin console → DNS).
+- A Backblaze B2 bucket and application key (for backups).
+- `git`, `restic` (backups), `age` + `sops` (secrets — installed by bootstrap if missing).
 
-## First run on the cloud VM
-
-Replace `<repo-url>` with this repository's URL:
+## First run
 
 ```bash
-git clone <repo-url> /opt/stacks
+git clone https://github.com/shengjiex98/home-server /opt/stacks
 cd /opt/stacks
 sudo ./scripts/bootstrap.sh
-cp .env.example .env && nano .env      # fill in all secrets
-chmod 600 .env
-docker compose up -d
-docker exec tailscale tailscale status  # approve node in admin console
-sudo apt install restic || sudo dnf install restic
-./scripts/restic-backup.sh              # first backup + repo init
-sudo ./scripts/install-restic-timer.sh  # automate daily
 ```
 
-The bootstrap script creates the `/srv` data tree, installs Docker when needed, configures the host firewall, and disables host SMB and Avahi services that would conflict with the Samba container. It is safe to run again.
+Then set up secrets — one of:
 
-## Accessing services
+- **Fresh setup (no existing age key):**
 
-Publish code-server through the Tailscale node. The `tailscale` and `code-server`
-containers are separate on the Docker network (no shared network namespace), so the
-serve target must name the `code-server` service rather than `127.0.0.1`/a bare port:
+  ```bash
+  mkdir -p ~/.config/sops/age && age-keygen -o ~/.config/sops/age/keys.txt
+  # put the printed public key into .sops.yaml, then:
+  cp .env.example .env && nano .env       # fill in all secrets
+  chmod 600 .env
+  ./scripts/secrets.sh encrypt            # writes .env.sops; commit it
+  ```
+
+  **Back up `~/.config/sops/age/keys.txt` to your password manager now.** It is the single key that unlocks every secret in this repo.
+
+- **Migrating (age key exists):**
+
+  ```bash
+  # restore the age key from your password manager to ~/.config/sops/age/keys.txt
+  ./scripts/secrets.sh decrypt            # recreates .env from .env.sops
+  nano .env                               # regenerate TS_AUTHKEY; update TS_HOSTNAME if desired
+  ./scripts/secrets.sh encrypt            # keep .env.sops in sync
+  ```
+
+Then bring the stack up:
 
 ```bash
-docker exec tailscale tailscale serve --bg http://code-server:8080
+docker compose up -d
+docker exec tailscale tailscale status   # approve nodes in the admin console if needed
+sudo apt install restic || sudo dnf install restic
+./scripts/restic-backup.sh               # first backup + repo init
+sudo ./scripts/install-restic-timer.sh   # automate daily
 ```
 
-Then open `https://<tailscale-name>` (no port — `tailscale serve` publishes HTTPS on
-443 by default) from a device on the same tailnet. The Compose port itself is bound
-only to host loopback and is not publicly exposed.
+Four nodes join the tailnet: the gateway (`TS_HOSTNAME`), `code`, and `files` (plus future service sidecars). Sidecar state persists under `/srv/ts-*`, so the auth key is only needed on each node's first start.
 
-Connect to the file shares from macOS Finder with:
+## Editing secrets later
 
-```text
-smb://<tailscale-name>
+```bash
+./scripts/secrets.sh edit      # opens the encrypted file in $EDITOR
+./scripts/secrets.sh decrypt   # refresh the plaintext .env the stack reads
+docker compose up -d           # re-create anything whose env changed
 ```
 
-Authenticate as `jerry` with the `SMB_PASSWORD` from `.env`. To configure Time Machine, connect to the server in Finder first, then open **System Settings → General → Time Machine → Add Backup Disk** and select `TimeMachine`. If it does not appear immediately, choose the mounted `TimeMachine` share through **Set Up Disk**.
+Commit `.env.sops` after changes. The plaintext `.env` is gitignored and exists only on the server.
+
+## SMB and Time Machine (LAN)
+
+One container ([servercontainers/samba](https://github.com/ServerContainers/samba)) provides the general `Files` share, the `TimeMachine` share, and Avahi/mDNS so Macs discover the server automatically. It was chosen over a dedicated Time Machine image (e.g. `mbentley/timemachine`) because it covers both roles in a single actively-maintained container configured entirely through environment variables — a TM-only image would have required a second SMB container.
+
+- Finder: `smb://<server>` — authenticate as `jerry` with `SMB_PASSWORD`.
+- Time Machine: connect in Finder once, then **System Settings → General → Time Machine → Add Backup Disk** and select `TimeMachine`. Both Macs back up to the same share; each gets its own `<MacName>.sparsebundle`.
+- Per-Mac disk usage: `sudo ./scripts/tm-usage.sh`
+
+SMB is LAN-only by design: Finder browsing over WAN latency is slow (per-file metadata round trips) and roaming laptops handle dropped SMB mounts poorly. For remote file access use the FileBrowser URL instead — same data, one HTTP request per action.
+
+## Updating images (Renovate)
+
+All images are pinned to exact versions. To get automated update PRs, install the [Renovate GitHub App](https://github.com/apps/renovate) on this repository; `renovate.json` is already configured (it understands the compose files, including samba's `a<alpine>-s<samba>` tag scheme). Apply an update with:
+
+```bash
+git pull && docker compose up -d
+```
+
+## Adding a new HTTP service
+
+Copy the pattern from `files/`: create `<name>/compose.yml` with the app container (data under `/srv/<name>`, `:Z` suffix) plus a tailscale sidecar (`hostname: <name>`, state under `/srv/ts-<name>`) and a `serve.json` proxying to the app's port. Add the file to the top-level `compose.yml` `include:` list and an entry to `gateway/homepage/services.yaml`. `/srv` is already covered by restic, so backups follow automatically.
+
+> [!NOTE]
+> Services with a database (e.g. Immich's Postgres) additionally need a pre-backup dump step before restic runs — file-level copies of a running database are not crash-safe.
 
 ## Claude Code and Codex in code-server
 
-Use code-server's Extensions view to install available Claude Code or Codex extensions from the Open VSX registry. Extension availability can differ from Microsoft's VS Code Marketplace.
-
-Claude Code also works from code-server's integrated terminal regardless of extension availability:
+Install Claude Code / Codex extensions from the Open VSX registry via code-server's Extensions view, or use the CLIs from the integrated terminal:
 
 ```bash
 npm i -g @anthropic-ai/claude-code
 claude
 ```
 
-For Codex, install its Open VSX extension when available or use the Codex CLI from the integrated terminal according to its installation instructions.
-
-## Migrate to the home PC (Fedora)
-
-The same repository and data paths move unchanged. Back up the cloud VM first, then run these commands on the Fedora host:
+## Migrate to another machine
 
 ```bash
-git clone <repo-url> /opt/stacks
+git clone https://github.com/shengjiex98/home-server /opt/stacks
 cd /opt/stacks
-sudo ./scripts/bootstrap.sh            # same script, auto-detects Fedora
-cp .env.example .env && nano .env      # regenerate TS_AUTHKEY; reuse B2/restic creds
-chmod 600 .env
-sudo ./scripts/restic-restore.sh       # pulls /srv data down from B2
+sudo ./scripts/bootstrap.sh
+# restore age key, then:
+./scripts/secrets.sh decrypt
+nano .env && ./scripts/secrets.sh encrypt   # fresh TS_AUTHKEY; same B2/restic creds
+sudo ./scripts/restic-restore.sh            # pulls /srv data down from B2
 docker compose up -d
 ```
 
-The commands are the same on both hosts. Secrets are the only values that must be entered again: generate a fresh `TS_AUTHKEY`, and reuse the B2 credentials and `RESTIC_PASSWORD` needed to decrypt the existing backup.
+The only things that move outside git are the age key (password manager) and the `/srv` data (restic). Tailscale URLs stay the same for the sidecar services (`code`, `files`); the gateway's URL follows `TS_HOSTNAME`.
 
 > [!CAUTION]
 > **CRITICAL WARNINGS**
 >
-> - Store `RESTIC_PASSWORD` somewhere off the server, such as a password manager. If it is lost, the encrypted B2 backups are unrecoverable.
-> - Never commit `.env`.
-> - Never expose code-server to the public internet. Access it through Tailscale only.
+> - Back up the **age key** (`~/.config/sops/age/keys.txt`) and **`RESTIC_PASSWORD`** off the server, e.g. in a password manager. Losing them makes the encrypted secrets / backups unrecoverable.
+> - Never commit the plaintext `.env`.
+> - Keep all HTTP services tailnet-only; do not publish ports or run `tailscale funnel` on them without thinking through auth.
 > - Test a restore once before trusting the backups:
 >
 >   ```bash
 >   ./scripts/restic-restore.sh latest /tmp/restore-test
 >   ```
->
->   Verify that the expected files appear under `/tmp/restore-test`.
 
 ## Backblaze B2 egress
 
 Restoring all of `/srv` downloads all backed-up data. B2 egress is inexpensive but still scales with data volume, so keep the cloud phase lean and do not park a large photo archive there unless you have accounted for its restore cost and time.
-
-## Extending the stack
-
-Add a service block to `docker-compose.yml` and bind-mount its persistent data under `/srv/<service>` with the SELinux-compatible `:Z` suffix:
-
-```yaml
-services:
-  example:
-    image: example/service:latest
-    volumes:
-      - /srv/example:/var/lib/example:Z
-```
-
-Because `/srv` is already included in the restic backup, the new service data is covered automatically. Once the stack grows substantially, split related services into multiple Compose files or projects while retaining the same `/srv` data convention.

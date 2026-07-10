@@ -1,0 +1,21 @@
+---
+- Services:
+    - Code Server:
+        icon: code-server.png
+        href: https://code.{{HOMEPAGE_VAR_TAILNET}}
+        description: VS Code in the browser
+        server: local
+        container: code-server
+
+    - Files:
+        icon: filebrowser.png
+        href: https://files.{{HOMEPAGE_VAR_TAILNET}}
+        description: Web file manager for the SMB share
+        server: local
+        container: filebrowser
+
+    - SMB / Time Machine:
+        icon: samba.png
+        description: "LAN only: smb://<server> in Finder"
+        server: local
+        container: samba
