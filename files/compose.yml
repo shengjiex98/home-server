@@ -10,6 +10,7 @@ services:
     user: "1000:1000"
     command: --noauth --baseurl /files
     volumes:
-      - /srv/shares:/srv:Z
+      # :z (shared) — samba mounts this same dir; see samba/compose.yml
+      - /srv/shares:/srv:z
       - /srv/filebrowser/database:/database:Z
       - /srv/filebrowser/config:/config:Z
