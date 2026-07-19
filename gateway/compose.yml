@@ -27,7 +27,7 @@ services:
       HOMEPAGE_VAR_HC_API_KEY: ${HC_API_KEY}
       HOMEPAGE_VAR_HC_CHECK_UUID: ${HC_CHECK_UUID}
     volumes:
-      - ./homepage:/app/config
+      - ./homepage:/app/config:Z
     depends_on:
       - socket-proxy
 
@@ -38,6 +38,10 @@ services:
     image: tecnativa/docker-socket-proxy:v0.4.2
     container_name: socket-proxy
     restart: unless-stopped
+    # SELinux blocks container_t from connecting to the host docker socket;
+    # run this one container unconfined (it exists to be the guarded boundary).
+    security_opt:
+      - label=disable
     environment:
       CONTAINERS: 1
       POST: 0
