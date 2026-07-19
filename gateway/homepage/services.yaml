@@ -19,3 +19,13 @@
         description: "LAN only: smb://<server> in Finder"
         server: local
         container: samba
+
+    - Restic Backup:
+        icon: healthchecks.png
+        href: https://healthchecks.io/
+        description: Daily 03:30 backup to Backblaze B2
+        widget:
+          type: healthchecks
+          url: https://healthchecks.io
+          key: "{{HOMEPAGE_VAR_HC_API_KEY}}"
+          uuid: "{{HOMEPAGE_VAR_HC_CHECK_UUID}}"

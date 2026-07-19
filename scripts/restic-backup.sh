@@ -7,6 +7,13 @@ set -a; . "$STACK_DIR/.env"; set +a
 
 export RESTIC_PASSWORD B2_ACCOUNT_ID B2_ACCOUNT_KEY
 
+# healthchecks.io dead-man's switch (no-op if HC_PING_URL is unset)
+hc() {
+  [[ -n "${HC_PING_URL:-}" ]] && curl -fsS -m 10 --retry 3 "${HC_PING_URL}$1" >/dev/null 2>&1 || true
+}
+trap 'hc /fail' ERR
+hc /start
+
 BACKUP_PATHS=(/srv /opt/stacks)
 # Time Machine is already a backup of the Mac, is huge, and churns constantly — exclude it.
 EXCLUDES=(--exclude /srv/timemachine)
@@ -39,4 +46,5 @@ if [[ -n "${RESTIC_LOCAL_REPO:-}" ]]; then
   run_target "$RESTIC_LOCAL_REPO"
 fi
 
+hc ""
 echo "[restic] Backup complete."

@@ -24,6 +24,8 @@ services:
     environment:
       HOMEPAGE_ALLOWED_HOSTS: ${TS_HOSTNAME}.${TS_TAILNET}
       HOMEPAGE_VAR_TAILNET: ${TS_TAILNET}
+      HOMEPAGE_VAR_HC_API_KEY: ${HC_API_KEY}
+      HOMEPAGE_VAR_HC_CHECK_UUID: ${HC_CHECK_UUID}
     volumes:
       - ./homepage:/app/config
     depends_on:
