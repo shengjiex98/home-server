@@ -12,7 +12,8 @@ services:
     cap_add:
       - CAP_NET_ADMIN
     environment:
-      AVAHI_DISABLE: "false"    # container owns mDNS; host avahi MUST be disabled
+      # AVAHI_DISABLE is presence-based: defining it AT ALL disables avahi.
+      # Leave it unset — the container owns mDNS; host avahi MUST be disabled.
       SAMBA_CONF_LOG_LEVEL: "1"
       ACCOUNT_jerry: ${SMB_PASSWORD}
       UID_jerry: "1000"
