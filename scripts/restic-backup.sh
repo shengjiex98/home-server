@@ -24,10 +24,19 @@ EXCLUDES=(--exclude /srv/timemachine --exclude /srv/tailscale --exclude '/srv/ts
 RETENTION=(--keep-daily 7 --keep-weekly 4 --keep-monthly 6)
 
 ensure_repo() {
-  local repo="$1"; shift
-  if ! restic -r "$repo" snapshots >/dev/null 2>&1; then
+  local repo="$1" out rc=0
+  out=$(restic -r "$repo" cat config 2>&1 >/dev/null) || rc=$?
+  [[ $rc -eq 0 ]] && return 0
+  # Init only when restic says the repo is missing (exit code 10 since 0.17,
+  # message match for older versions). Any other failure — transient network,
+  # B2 auth, locks — must fail the run rather than trip a doomed `restic init`.
+  if [[ $rc -eq 10 ]] || grep -q 'Is there a repository at' <<<"$out"; then
     echo "[restic] Initializing repo: $repo"
     restic -r "$repo" init
+  else
+    echo "[restic] Cannot access $repo:" >&2
+    echo "$out" >&2
+    return 1
   fi
 }
 
