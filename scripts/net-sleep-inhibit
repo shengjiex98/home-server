@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Hold a systemd sleep inhibitor while SSH or SMB sessions are active, so
+# GNOME idle-suspend doesn't kill remote logins or Time Machine backups.
+set -u
+
+INHIBIT_PID=""
+
+active_sessions() {
+  ss -H -t state established '( sport = :22 or sport = :445 )' | wc -l
+}
+
+cleanup() { [ -n "$INHIBIT_PID" ] && kill "$INHIBIT_PID" 2>/dev/null; exit 0; }
+trap cleanup TERM INT
+
+while true; do
+  n=$(active_sessions)
+  if [ "$n" -gt 0 ] && [ -z "$INHIBIT_PID" ]; then
+    systemd-inhibit --what=sleep --mode=block --who=net-sleep-inhibit \
+      --why="active SSH/SMB sessions" sleep infinity &
+    INHIBIT_PID=$!
+    echo "inhibiting sleep ($n active sessions)"
+  elif [ "$n" -eq 0 ] && [ -n "$INHIBIT_PID" ]; then
+    kill "$INHIBIT_PID" 2>/dev/null
+    wait "$INHIBIT_PID" 2>/dev/null
+    INHIBIT_PID=""
+    echo "no active sessions, allowing sleep"
+  fi
+  sleep 30
+done
