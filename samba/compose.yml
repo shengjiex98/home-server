@@ -18,7 +18,7 @@ services:
       ACCOUNT_jerry: ${SMB_PASSWORD}
       UID_jerry: "1000"
       SAMBA_GLOBAL_STANZA: "fruit:aapl=yes;fruit:nfs_aces=no;fruit:zero_file_id=yes;min protocol=SMB2"
-      SAMBA_VOLUME_CONFIG_timemachine: "[TimeMachine]; path=/shares/tm; valid users=jerry; veto files=/._*/.DS_Store/; vfs objects=catia fruit streams_xattr; fruit:time machine=yes; fruit:time machine max size=1T"
+      SAMBA_VOLUME_CONFIG_timemachine: "[TimeMachine]; path=/shares/tm; read only=no; valid users=jerry; veto files=/._*/.DS_Store/; vfs objects=catia fruit streams_xattr; fruit:time machine=yes; fruit:time machine max size=1T"
       SAMBA_VOLUME_CONFIG_files: "[Files]; path=/shares/files; valid users=jerry; read only=no"
     volumes:
       - /srv/timemachine:/shares/tm:Z
