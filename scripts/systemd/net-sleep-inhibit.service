@@ -1,0 +1,11 @@
+[Unit]
+Description=Inhibit sleep while SSH/SMB sessions are active
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/net-sleep-inhibit
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
