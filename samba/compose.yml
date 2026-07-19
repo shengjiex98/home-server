@@ -22,4 +22,6 @@ services:
       SAMBA_VOLUME_CONFIG_files: "[Files]; path=/shares/files; valid users=jerry; read only=no"
     volumes:
       - /srv/timemachine:/shares/tm:Z
-      - /srv/shares:/shares/files:Z
+      # :z (shared), not :Z — filebrowser mounts this same dir; a private label
+      # would be stolen by whichever container was recreated last.
+      - /srv/shares:/shares/files:z

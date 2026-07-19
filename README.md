@@ -41,7 +41,7 @@ Routing lives in two small files: `gateway/serve.json` (tailscale serve → cadd
 
 ## Prerequisites
 
-- Ubuntu/Debian or Fedora, with `git`.
+- Ubuntu/Debian or Fedora, with `git`. Setting up a Fedora box from scratch (storage layout, NVIDIA/Secure Boot, docker quirks): see [docs/setup/fedora.md](docs/setup/fedora.md).
 - A Tailscale account; MagicDNS + HTTPS certificates enabled (admin console → DNS). Joining a new server needs a **reusable, non-ephemeral** auth key.
 - A Backblaze B2 bucket + application key (backups), a healthchecks.io check per server (backup alerting).
 - `restic`, `age`, `sops` — bootstrap installs age/sops; install restic from your package manager.
@@ -98,6 +98,17 @@ The age key at `~/.config/sops/age/keys.txt` unlocks everything — **keep a cop
 One container ([servercontainers/samba](https://github.com/ServerContainers/samba)) provides the `Files` share, the `TimeMachine` share, and Avahi/mDNS auto-discovery. Finder: `smb://<server>`, user `jerry` with `SMB_PASSWORD`. Time Machine: connect once in Finder, then **System Settings → General → Time Machine → Add Backup Disk**. Both Macs share one TimeMachine share; per-Mac usage: `sudo ./scripts/tm-usage.sh`.
 
 SMB is LAN-only by design (WAN latency makes Finder-over-SMB miserable); use `/files/` remotely.
+
+## Desktop hosts: sleep inhibitor
+
+A server that doubles as a desktop (GNOME) will idle-suspend even while remote sessions are active — killing SSH logins and aborting Time Machine backups mid-transfer (TM writes for hours on a first backup and never completes if the host sleeps). The fix is a small daemon that holds a `systemd-inhibit --what=sleep --mode=block` lock whenever established connections exist on port 22 (SSH) or 445 (SMB), and releases it when the last session closes, so the machine still sleeps when genuinely idle:
+
+```bash
+sudo ./scripts/install-sleep-inhibitor.sh
+systemd-inhibit --list        # shows the net-sleep-inhibit lock while a session is open
+```
+
+Not needed on cloud servers or anything that never suspends. Note it only protects *running* sessions: a suspended host still won't be discoverable to *start* a TM backup until something wakes it.
 
 ## Backups
 
