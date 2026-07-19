@@ -1,27 +1,14 @@
 services:
-  # ---------- Tailscale sidecar: https://files.<tailnet>.ts.net ----------
-  ts-files:
-    image: tailscale/tailscale:v1.98.4
-    container_name: ts-files
-    hostname: files
-    restart: unless-stopped
-    environment:
-      TS_AUTHKEY: ${TS_AUTHKEY}
-      TS_STATE_DIR: /var/lib/tailscale
-      TS_SERVE_CONFIG: /config/serve.json
-    volumes:
-      - /srv/ts-files:/var/lib/tailscale:Z
-      - ./serve.json:/config/serve.json:ro
-
   # ---------- FileBrowser: web UI over the same data as the SMB share ----------
-  # Auth is delegated to Tailscale (only tailnet devices can reach it), so
-  # FileBrowser runs with --noauth. Runs as uid 1000 to match /srv/shares.
+  # Reachable via caddy at /files/ on this server's tailnet hostname. Auth is
+  # delegated to Tailscale (only tailnet devices can reach it), so FileBrowser
+  # runs with --noauth. Runs as uid 1000 to match /srv/shares ownership.
   filebrowser:
     image: filebrowser/filebrowser:v2.63.18
     container_name: filebrowser
     restart: unless-stopped
     user: "1000:1000"
-    command: --noauth
+    command: --noauth --baseurl /files
     volumes:
       - /srv/shares:/srv:Z
       - /srv/filebrowser/database:/database:Z

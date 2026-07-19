@@ -15,8 +15,11 @@ trap 'hc /fail' ERR
 hc /start
 
 BACKUP_PATHS=(/srv /opt/stacks)
-# Time Machine is already a backup of the Mac, is huge, and churns constantly — exclude it.
-EXCLUDES=(--exclude /srv/timemachine)
+# Excluded:
+# - /srv/timemachine: already a backup of the Macs, huge, churns constantly.
+# - /srv/tailscale, /srv/ts-*: MACHINE IDENTITY (node keys). Restoring these
+#   onto another machine makes two servers fight over the same tailnet nodes.
+EXCLUDES=(--exclude /srv/timemachine --exclude /srv/tailscale --exclude '/srv/ts-*')
 
 RETENTION=(--keep-daily 7 --keep-weekly 4 --keep-monthly 6)
 

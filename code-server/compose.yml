@@ -1,20 +1,7 @@
 services:
-  # ---------- Tailscale sidecar: https://code.<tailnet>.ts.net ----------
-  ts-code:
-    image: tailscale/tailscale:v1.98.4
-    container_name: ts-code
-    hostname: code
-    restart: unless-stopped
-    environment:
-      TS_AUTHKEY: ${TS_AUTHKEY}
-      TS_STATE_DIR: /var/lib/tailscale
-      TS_SERVE_CONFIG: /config/serve.json
-    volumes:
-      - /srv/ts-code:/var/lib/tailscale:Z
-      - ./serve.json:/config/serve.json:ro
-
   # ---------- code-server: browser VS Code ----------
-  # No published ports: only reachable through the ts-code sidecar.
+  # No published ports: reachable only via caddy at /code/ on this server's
+  # tailnet hostname.
   code-server:
     image: codercom/code-server:4.126.0
     container_name: code-server

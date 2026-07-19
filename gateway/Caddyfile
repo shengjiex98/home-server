@@ -1,0 +1,26 @@
+# Path router behind the Tailscale gateway node.
+# https://<server>.<tailnet>.ts.net/        -> homepage dashboard
+# https://<server>.<tailnet>.ts.net/code/   -> code-server
+# https://<server>.<tailnet>.ts.net/files/  -> FileBrowser
+# TLS is terminated by tailscale serve; Caddy only ever speaks plain HTTP.
+{
+	auto_https off
+}
+
+:80 {
+	redir /code /code/ 308
+	# code-server expects the prefix stripped (its asset paths are relative)
+	handle_path /code/* {
+		reverse_proxy code-server:8080
+	}
+
+	redir /files /files/ 308
+	# FileBrowser runs with --baseurl /files, so the prefix is passed through
+	handle /files/* {
+		reverse_proxy filebrowser:80
+	}
+
+	handle {
+		reverse_proxy homepage:3000
+	}
+}

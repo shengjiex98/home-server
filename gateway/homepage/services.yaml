@@ -2,14 +2,14 @@
 - Services:
     - Code Server:
         icon: code-server.png
-        href: https://code.{{HOMEPAGE_VAR_TAILNET}}
+        href: /code/
         description: VS Code in the browser
         server: local
         container: code-server
 
     - Files:
         icon: filebrowser.png
-        href: https://files.{{HOMEPAGE_VAR_TAILNET}}
+        href: /files/
         description: Web file manager for the SMB share
         server: local
         container: filebrowser

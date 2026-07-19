@@ -1,5 +1,8 @@
-# Secrets — never commit the plaintext (.env.sops, the encrypted copy, IS committed)
+# Secrets — never commit the plaintext (.env.sops and hosts/*.sops.env, the
+# encrypted copies, ARE committed)
 .env
+# Which host's config this server uses (machine-local)
+.host
 
 # homepage writes logs into its bind-mounted config dir
 gateway/homepage/logs/

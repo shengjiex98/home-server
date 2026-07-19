@@ -22,7 +22,7 @@ log "Detected distro family: $FAMILY ($PRETTY_NAME)"
 
 # --- Directory trees ---
 log "Creating /opt/stacks and /srv trees"
-mkdir -p /srv/{timemachine,shares,tailscale,ts-code,ts-files}
+mkdir -p /srv/{timemachine,shares,tailscale}
 mkdir -p /srv/code-server/{config,projects}
 mkdir -p /srv/filebrowser/{database,config}
 # code-server, samba and filebrowser run as uid 1000; make sure it owns their data
